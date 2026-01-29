@@ -1,7 +1,7 @@
 // Recursive descent parser for SADL
 
 import { Lexer, Token, TokenType } from './lexer.js';
-import { AST, NodeClass, LinkClass, Instance, Connection, Connector, PortSpec } from './types.js';
+import { AST, NodeClass, LinkClass, Instance, Connection, Connector, PortSpec, InstanceEntry } from './types.js';
 
 export class Parser {
   private tokens: Token[] = [];
@@ -209,23 +209,49 @@ export class Parser {
 
   private parseInstance(): Instance {
     const nodeClassToken = this.expect('IDENTIFIER', 'Expected node class name');
-    const names: string[] = [];
+    const instances: InstanceEntry[] = [];
 
-    // Parse comma-separated instance names
-    const firstNameToken = this.expect('IDENTIFIER', 'Expected instance name');
-    names.push(firstNameToken.value);
+    // Parse comma-separated instance entries: name or name(ip)
+    instances.push(this.parseInstanceEntry());
 
     while (this.match('COMMA')) {
-      const nameToken = this.expect('IDENTIFIER', 'Expected instance name');
-      names.push(nameToken.value);
+      instances.push(this.parseInstanceEntry());
     }
 
     return {
       kind: 'Instance',
       nodeClass: nodeClassToken.value,
-      names,
+      instances,
       position: { line: nodeClassToken.line, column: nodeClassToken.column },
     };
+  }
+
+  private parseInstanceEntry(): InstanceEntry {
+    const nameToken = this.expect('IDENTIFIER', 'Expected instance name');
+    let ip: string | undefined;
+
+    // Check for optional IP address: name(192.168.1.10)
+    if (this.match('LPAREN')) {
+      ip = this.parseIPAddress();
+      this.expect('RPAREN', 'Expected closing parenthesis after IP address');
+    }
+
+    return { name: nameToken.value, ip };
+  }
+
+  private parseIPAddress(): string {
+    // Parse IP address: number.number.number.number
+    const parts: string[] = [];
+
+    const first = this.expect('NUMBER', 'Expected IP address octet');
+    parts.push(first.value);
+
+    while (this.match('DOT')) {
+      const octet = this.expect('NUMBER', 'Expected IP address octet');
+      parts.push(octet.value);
+    }
+
+    return parts.join('.');
   }
 
   private parseConnection(): Connection {

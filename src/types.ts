@@ -39,10 +39,15 @@ export interface LinkClass extends BaseNode {
   };
 }
 
+export interface InstanceEntry {
+  name: string;
+  ip?: string;
+}
+
 export interface Instance extends BaseNode {
   kind: 'Instance';
   nodeClass: string;
-  names: string[];
+  instances: InstanceEntry[];
 }
 
 export interface Connection extends BaseNode {

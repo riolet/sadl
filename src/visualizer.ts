@@ -11,6 +11,7 @@ export interface NodePosition {
 
 export interface RenderedInstance {
   name: string;
+  ip?: string;
   nodeClass: NodeClass;
   position: NodePosition;
   connectors: { name: string; type: 'sercon' | 'clicon'; y: number }[];
@@ -208,10 +209,10 @@ export class Visualizer {
     }
 
     // Flatten all instances
-    const allInstances: { name: string; nodeClass: string }[] = [];
+    const allInstances: { name: string; nodeClass: string; ip?: string }[] = [];
     for (const inst of ast.instances) {
-      for (const name of inst.names) {
-        allInstances.push({ name, nodeClass: inst.nodeClass });
+      for (const entry of inst.instances) {
+        allInstances.push({ name: entry.name, nodeClass: inst.nodeClass, ip: entry.ip });
       }
     }
 
@@ -330,6 +331,7 @@ export class Visualizer {
 
       this.instances.push({
         name: inst.name,
+        ip: inst.ip,
         nodeClass,
         position: {
           x: padding + layer * columnSpacing,
@@ -373,10 +375,11 @@ export class Visualizer {
     ctx.textAlign = 'center';
     ctx.fillText(name, position.x + position.width / 2, position.y + 18, position.width - 10);
 
-    // Draw node class name (smaller)
+    // Draw node class name and optional IP (smaller)
     ctx.font = `${fontSize - 2}px ${fontFamily}`;
     ctx.fillStyle = colors.connectionText;
-    ctx.fillText(`(${nodeClass.name})`, position.x + position.width / 2, position.y + 45, position.width - 10);
+    const subtitle = instance.ip ? `(${nodeClass.name}) ${instance.ip}` : `(${nodeClass.name})`;
+    ctx.fillText(subtitle, position.x + position.width / 2, position.y + 45, position.width - 10);
 
     // Draw connectors on the edge
     ctx.font = `${fontSize - 2}px ${fontFamily}`;

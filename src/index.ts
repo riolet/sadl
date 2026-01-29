@@ -14,6 +14,7 @@ export type {
   NodeClass,
   LinkClass,
   Instance,
+  InstanceEntry,
   Connection,
   Connector,
   PortSpec,
