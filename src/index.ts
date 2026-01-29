@@ -16,6 +16,7 @@ export type {
   Instance,
   Connection,
   Connector,
+  PortSpec,
   Position,
 } from './types.js';
 

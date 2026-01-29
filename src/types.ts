@@ -9,11 +9,16 @@ export interface BaseNode {
   position?: Position;
 }
 
+export interface PortSpec {
+  protocol: 'TCP' | 'UDP';
+  port?: number;
+  portRange?: { start: number; end: number };
+}
+
 export interface Connector extends BaseNode {
   type: 'sercon' | 'clicon';
   name: string;
-  port: number;
-  protocol: string;
+  ports: PortSpec[];  // Empty for ephemeral client connectors
 }
 
 export interface NodeClass extends BaseNode {

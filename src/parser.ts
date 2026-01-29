@@ -1,7 +1,7 @@
 // Recursive descent parser for SADL
 
 import { Lexer, Token, TokenType } from './lexer.js';
-import { AST, NodeClass, LinkClass, Instance, Connection, Connector } from './types.js';
+import { AST, NodeClass, LinkClass, Instance, Connection, Connector, PortSpec } from './types.js';
 
 export class Parser {
   private tokens: Token[] = [];
@@ -94,7 +94,8 @@ export class Parser {
 
     const connectors: Connector[] = [];
 
-    while (this.check('SERCON') || this.check('CLICON')) {
+    // Parse connectors: *name for server, name for client
+    while (this.check('STAR') || this.isConnectorStart()) {
       connectors.push(this.parseConnector());
     }
 
@@ -106,24 +107,72 @@ export class Parser {
     };
   }
 
+  // Check if current position looks like a connector start
+  private isConnectorStart(): boolean {
+    return this.check('IDENTIFIER');
+  }
+
   private parseConnector(): Connector {
-    const typeToken = this.advance(); // SERCON or CLICON
-    const type = typeToken.type === 'SERCON' ? 'sercon' : 'clicon';
+    let type: 'sercon' | 'clicon' = 'clicon';
+    let startToken: Token;
+
+    // Check for * prefix (server connector)
+    if (this.match('STAR')) {
+      type = 'sercon';
+      startToken = this.tokens[this.pos - 1];
+    } else {
+      startToken = this.peek();
+    }
 
     const nameToken = this.expect('IDENTIFIER', 'Expected connector name');
-    this.expect('LPAREN', 'Expected opening parenthesis');
-    const portToken = this.expect('NUMBER', 'Expected port number');
-    this.expect('COMMA', 'Expected comma');
-    const protocolToken = this.expect('IDENTIFIER', 'Expected protocol');
-    this.expect('RPAREN', 'Expected closing parenthesis');
+    const ports: PortSpec[] = [];
+
+    // Port specs are optional (client connectors can have no ports)
+    if (this.match('LPAREN')) {
+      // Parse port specifications
+      do {
+        ports.push(this.parsePortSpec());
+      } while (this.match('COMMA'));
+
+      this.expect('RPAREN', 'Expected closing parenthesis');
+    }
 
     return {
       type,
       name: nameToken.value,
-      port: parseInt(portToken.value, 10),
-      protocol: protocolToken.value,
-      position: { line: typeToken.line, column: typeToken.column },
+      ports,
+      position: { line: startToken.line, column: startToken.column },
     };
+  }
+
+  private parsePortSpec(): PortSpec {
+    let protocol: 'TCP' | 'UDP' = 'TCP';
+
+    // Check for UDP wrapper
+    if (this.match('UDP')) {
+      protocol = 'UDP';
+      this.expect('LPAREN', 'Expected opening parenthesis after UDP');
+      const innerSpec = this.parsePortOrRange();
+      this.expect('RPAREN', 'Expected closing parenthesis after UDP port');
+      return { protocol, ...innerSpec };
+    }
+
+    // Default TCP
+    const spec = this.parsePortOrRange();
+    return { protocol, ...spec };
+  }
+
+  private parsePortOrRange(): { port?: number; portRange?: { start: number; end: number } } {
+    const startPort = this.expect('NUMBER', 'Expected port number');
+    const port = parseInt(startPort.value, 10);
+
+    // Check for range (e.g., 8000-8080)
+    if (this.match('DASH')) {
+      const endPort = this.expect('NUMBER', 'Expected end port number');
+      return { portRange: { start: port, end: parseInt(endPort.value, 10) } };
+    }
+
+    return { port };
   }
 
   private parseLinkClass(): LinkClass {

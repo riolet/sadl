@@ -4,8 +4,7 @@ export type TokenType =
   | 'NODECLASS'
   | 'LINKCLASS'
   | 'CONNECT'
-  | 'SERCON'
-  | 'CLICON'
+  | 'UDP'
   | 'IDENTIFIER'
   | 'NUMBER'
   | 'LPAREN'
@@ -13,6 +12,8 @@ export type TokenType =
   | 'COMMA'
   | 'COLON'
   | 'DOT'
+  | 'STAR'
+  | 'DASH'
   | 'EOF';
 
 export interface Token {
@@ -26,8 +27,7 @@ const KEYWORDS: Record<string, TokenType> = {
   nodeclass: 'NODECLASS',
   linkclass: 'LINKCLASS',
   connect: 'CONNECT',
-  sercon: 'SERCON',
-  clicon: 'CLICON',
+  udp: 'UDP',
 };
 
 export class Lexer {
@@ -143,6 +143,12 @@ export class Lexer {
       } else if (char === '.') {
         this.advance();
         tokens.push({ type: 'DOT', value: '.', line, column });
+      } else if (char === '*') {
+        this.advance();
+        tokens.push({ type: 'STAR', value: '*', line, column });
+      } else if (char === '-') {
+        this.advance();
+        tokens.push({ type: 'DASH', value: '-', line, column });
       } else {
         throw new Error(`Unexpected character '${char}' at line ${line}, column ${column}`);
       }

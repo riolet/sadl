@@ -154,6 +154,7 @@ export class Visualizer {
       this.ast = ast;
       this.layoutInstances(ast);
       this.connections = ast.connections;
+      this.autoSizeCanvas();
     }
 
     const { ctx, options } = this;
@@ -161,7 +162,7 @@ export class Visualizer {
 
     // Clear canvas
     ctx.fillStyle = colors.background;
-    ctx.fillRect(0, 0, options.width, options.height);
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     // Draw connections first (behind nodes)
     this.drawConnections();
@@ -169,6 +170,31 @@ export class Visualizer {
     // Draw instances
     for (const instance of this.instances) {
       this.drawInstance(instance);
+    }
+  }
+
+  private autoSizeCanvas(): void {
+    const { padding } = this.options;
+    let maxX = 0;
+    let maxY = 0;
+
+    for (const instance of this.instances) {
+      const rightEdge = instance.position.x + instance.position.width;
+      const bottomEdge = instance.position.y + instance.position.height;
+      maxX = Math.max(maxX, rightEdge);
+      maxY = Math.max(maxY, bottomEdge);
+    }
+
+    const requiredWidth = maxX + padding;
+    const requiredHeight = maxY + padding;
+
+    // Only resize if content exceeds current size
+    const newWidth = Math.max(this.options.width, requiredWidth);
+    const newHeight = Math.max(this.options.height, requiredHeight);
+
+    if (this.canvas.width !== newWidth || this.canvas.height !== newHeight) {
+      this.canvas.width = newWidth;
+      this.canvas.height = newHeight;
     }
   }
 

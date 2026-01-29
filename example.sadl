@@ -1,28 +1,28 @@
 nodeclass browser_client:
-    clicon  https_connector (443, TCP)
+    https_connector (443)
 
 nodeclass web_server:
-    sercon https_listener (443, TCP)
-    clicon mysql_connector (3306, TCP)
+    *https_listener (443)
+    mysql_connector
 
 nodeclass mysql_server:
-    sercon mysql_listener (3306, TCP)
+    *mysql_listener (3306)
 
 
-linkclass (browser_client.https_connector,web_server.https_listener)
-linkclass (web_server.mysql_connector,mysql_server.mysql_listener)
+linkclass (browser_client.https_connector, web_server.https_listener)
+linkclass (web_server.mysql_connector, mysql_server.mysql_listener)
 
-#Instanstiate internal_web_server instance and external_web_server instance
+#Instantiate internal_web_server instance and external_web_server instance
 web_server internal_web_server, external_web_server
 
-#Instanstiate internal_browser_client
+#Instantiate internal_browser_client
 browser_client internal_browser_client, external_browser_client
 
-#Instanstiate mysql_server
-mysql_server primary_mysql_server 
+#Instantiate mysql_server
+mysql_server primary_mysql_server
 
 
-connect (internal_browser_client,internal_web_server)   
-connect (external_browser_client,external_web_server)
+connect (internal_browser_client, internal_web_server)
+connect (external_browser_client, external_web_server)
 connect (internal_web_server, primary_mysql_server)
 connect (external_web_server, primary_mysql_server)
