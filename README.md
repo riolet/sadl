@@ -6,23 +6,49 @@ System Architecture Design Language
 
 SADL is a language for describing and designing system architectures. It models systems as entities with connections between them.
 
-## Concepts
+## Syntax
 
-### Entities
+### Node Classes
 
-Entities are the building blocks of a system architecture. Each entity has a name and can have connectors.
+Define entity templates with connectors:
 
-### Connectors
+```sadl
+nodeclass web_server:
+    sercon https_listener (443, TCP)
+    clicon mysql_connector (3306, TCP)
+```
 
-Connectors define how entities communicate:
+- `sercon` - Server connector (port, protocol) - listens for connections
+- `clicon` - Client connector (port, protocol) - initiates connections
 
-- **Server connectors** - Listen for incoming connections from client connectors
-- **Client connectors** - Initiate connections to server connectors
+### Link Classes
+
+Define valid connection patterns between connector types:
+
+```sadl
+linkclass (browser_client.https_connector, web_server.https_listener)
+```
+
+### Instantiation
+
+Create instances of node classes:
+
+```sadl
+web_server internal_web_server, external_web_server
+```
 
 ### Connections
 
-Connections link client connectors to server connectors, defining the communication pathways between entities.
+Connect instances:
+
+```sadl
+connect (internal_browser_client, internal_web_server)
+```
+
+### Comments
+
+Lines starting with `#` are comments.
 
 ## License
 
-TBD
+GPL-3.0 - See [LICENSE](LICENSE) for details.

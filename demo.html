@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SADL Visualizer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d0d1a;
+      color: #e8e8e8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1a1a2e;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 500;
+    }
+
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .editor-panel {
+      width: 400px;
+      background: #16213e;
+      border-right: 1px solid #0f3460;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .editor-header {
+      padding: 1rem;
+      border-bottom: 1px solid #0f3460;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .editor-header h2 {
+      font-size: 1rem;
+      font-weight: 500;
+    }
+
+    #parse-btn {
+      background: #4ecca3;
+      color: #1a1a2e;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    #parse-btn:hover {
+      background: #3db892;
+    }
+
+    #editor {
+      flex: 1;
+      background: #0d0d1a;
+      color: #e8e8e8;
+      border: none;
+      padding: 1rem;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+    }
+
+    .canvas-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .canvas-header {
+      padding: 1rem;
+      border-bottom: 1px solid #0f3460;
+      background: #1a1a2e;
+    }
+
+    .canvas-header h2 {
+      font-size: 1rem;
+      font-weight: 500;
+    }
+
+    .canvas-container {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem;
+    }
+
+    #canvas {
+      display: block;
+      border-radius: 8px;
+    }
+
+    .error {
+      background: #ff6b6b22;
+      border: 1px solid #ff6b6b;
+      color: #ff6b6b;
+      padding: 1rem;
+      margin: 1rem;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+
+    .legend {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: #bdc3c7;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .legend-dot.sercon {
+      background: #4ecca3;
+    }
+
+    .legend-dot.clicon {
+      background: #ff6b6b;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SADL Visualizer</h1>
+  </header>
+
+  <div class="container">
+    <div class="editor-panel">
+      <div class="editor-header">
+        <h2>SADL Source</h2>
+        <button id="parse-btn">Parse & Render</button>
+      </div>
+      <textarea id="editor" spellcheck="false">nodeclass browser_client:
+    clicon  https_connector (443, TCP)
+
+nodeclass web_server:
+    sercon https_listener (443, TCP)
+    clicon mysql_connector (3306, TCP)
+
+nodeclass mysql_server:
+    sercon mysql_listener (3306, TCP)
+
+
+linkclass (browser_client.https_connector,web_server.https_listener)
+linkclass (web_server.mysql_connector,mysql_server.mysql_listener)
+
+#Instanstiate internal_web_server instance and external_web_server instance
+web_server internal_web_server, external_web_server
+
+#Instanstiate internal_browser_client
+browser_client internal_browser_client, external_browser_client
+
+#Instanstiate mysql_server
+mysql_server primary_mysql_server
+
+
+connect (internal_browser_client,internal_web_server)
+connect (external_browser_client,external_web_server)
+connect (internal_web_server, primary_mysql_server)
+connect (external_web_server, primary_mysql_server)</textarea>
+    </div>
+
+    <div class="canvas-panel">
+      <div class="canvas-header">
+        <h2>Architecture Diagram</h2>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-dot sercon"></div>
+            <span>Server Connector (sercon)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot clicon"></div>
+            <span>Client Connector (clicon)</span>
+          </div>
+          <div class="legend-item">
+            <span>📌 Drag nodes to reposition</span>
+          </div>
+        </div>
+      </div>
+      <div class="canvas-container">
+        <div id="error-container"></div>
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { parse } from './dist/index.js';
+    import { Visualizer } from './dist/visualizer.js';
+
+    const editor = document.getElementById('editor');
+    const canvas = document.getElementById('canvas');
+    const parseBtn = document.getElementById('parse-btn');
+    const errorContainer = document.getElementById('error-container');
+
+    const visualizer = new Visualizer(canvas, {
+      width: 1000,
+      height: 600,
+    });
+
+    function parseAndRender() {
+      errorContainer.innerHTML = '';
+      try {
+        const ast = parse(editor.value);
+        visualizer.render(ast);
+      } catch (e) {
+        errorContainer.innerHTML = `<div class="error">${e.message}</div>`;
+      }
+    }
+
+    parseBtn.addEventListener('click', parseAndRender);
+
+    // Parse on load
+    parseAndRender();
+  </script>
+</body>
+</html>
