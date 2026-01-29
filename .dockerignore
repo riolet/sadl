@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.claude/
+*.log
+.git/
+.gitignore
+clean_render_example.png

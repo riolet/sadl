@@ -180,14 +180,14 @@ nodeclass mysql_server:
 linkclass (browser_client.https_connector, web_server.https_listener)
 linkclass (web_server.mysql_connector, mysql_server.mysql_listener)
 
-#Instantiate internal_web_server instance and external_web_server instance
-web_server internal_web_server, external_web_server
+#Instantiate web_server instances with IPs
+web_server internal_web_server(192.168.1.10), external_web_server(10.0.10.10)
 
-#Instantiate internal_browser_client
+#Instantiate browser_client instances
 browser_client internal_browser_client, external_browser_client
 
-#Instantiate mysql_server
-mysql_server primary_mysql_server
+#Instantiate mysql_server with IP
+mysql_server primary_mysql_server(192.168.1.11)
 
 
 connect (internal_browser_client, internal_web_server)

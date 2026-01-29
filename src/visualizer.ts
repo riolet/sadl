@@ -80,6 +80,11 @@ export class Visualizer {
   private dragOffset = { x: 0, y: 0 };
   private ast: AST | null = null;
 
+  // Viewport state for pan and zoom
+  private viewport = { x: 0, y: 0, scale: 1 };
+  private isPanning = false;
+  private panStart = { x: 0, y: 0 };
+
   constructor(canvas: HTMLCanvasElement, options: VisualizerOptions = {}) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
@@ -99,40 +104,62 @@ export class Visualizer {
     this.setupEventListeners();
   }
 
+  // Convert screen coordinates to world coordinates
+  private screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+    return {
+      x: (screenX - this.viewport.x) / this.viewport.scale,
+      y: (screenY - this.viewport.y) / this.viewport.scale,
+    };
+  }
+
   private setupEventListeners(): void {
     this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
     this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
     this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
     this.canvas.addEventListener('mouseleave', this.onMouseUp.bind(this));
+    this.canvas.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
   }
 
   private onMouseDown(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const { x, y } = this.screenToWorld(screenX, screenY);
 
+    // Check if clicking on a node
     for (const instance of this.instances) {
       const pos = instance.position;
       if (x >= pos.x && x <= pos.x + pos.width && y >= pos.y && y <= pos.y + pos.height) {
         this.draggedNode = instance;
         this.dragOffset = { x: x - pos.x, y: y - pos.y };
         this.canvas.style.cursor = 'grabbing';
-        break;
+        return;
       }
     }
+
+    // Start panning if not clicking on a node
+    this.isPanning = true;
+    this.panStart = { x: screenX - this.viewport.x, y: screenY - this.viewport.y };
+    this.canvas.style.cursor = 'grabbing';
   }
 
   private onMouseMove(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
 
     if (this.draggedNode) {
+      const { x, y } = this.screenToWorld(screenX, screenY);
       this.draggedNode.position.x = x - this.dragOffset.x;
       this.draggedNode.position.y = y - this.dragOffset.y;
       this.render();
+    } else if (this.isPanning) {
+      this.viewport.x = screenX - this.panStart.x;
+      this.viewport.y = screenY - this.panStart.y;
+      this.render();
     } else {
       // Update cursor on hover
+      const { x, y } = this.screenToWorld(screenX, screenY);
       let hovering = false;
       for (const instance of this.instances) {
         const pos = instance.position;
@@ -141,13 +168,37 @@ export class Visualizer {
           break;
         }
       }
-      this.canvas.style.cursor = hovering ? 'grab' : 'default';
+      this.canvas.style.cursor = hovering ? 'grab' : 'move';
     }
   }
 
   private onMouseUp(): void {
     this.draggedNode = null;
-    this.canvas.style.cursor = 'default';
+    this.isPanning = false;
+    this.canvas.style.cursor = 'move';
+  }
+
+  private onWheel(e: WheelEvent): void {
+    e.preventDefault();
+
+    const rect = this.canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+
+    // Zoom factor
+    const zoomIntensity = 0.1;
+    const delta = e.deltaY > 0 ? -zoomIntensity : zoomIntensity;
+    const newScale = Math.min(Math.max(0.1, this.viewport.scale + delta), 5);
+
+    // Zoom toward mouse position
+    const worldX = (screenX - this.viewport.x) / this.viewport.scale;
+    const worldY = (screenY - this.viewport.y) / this.viewport.scale;
+
+    this.viewport.scale = newScale;
+    this.viewport.x = screenX - worldX * newScale;
+    this.viewport.y = screenY - worldY * newScale;
+
+    this.render();
   }
 
   render(ast?: AST): void {
@@ -161,9 +212,14 @@ export class Visualizer {
     const { ctx, options } = this;
     const { colors } = options;
 
-    // Clear canvas
+    // Clear canvas (in screen space, before transform)
     ctx.fillStyle = colors.background;
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Apply viewport transform
+    ctx.save();
+    ctx.translate(this.viewport.x, this.viewport.y);
+    ctx.scale(this.viewport.scale, this.viewport.scale);
 
     // Draw connections first (behind nodes)
     this.drawConnections();
@@ -172,6 +228,9 @@ export class Visualizer {
     for (const instance of this.instances) {
       this.drawInstance(instance);
     }
+
+    // Restore context
+    ctx.restore();
   }
 
   private autoSizeCanvas(): void {

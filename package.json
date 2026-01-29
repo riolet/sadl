@@ -1,7 +1,7 @@
 {
-  "name": "sadl-parser",
+  "name": "sadlmap",
   "version": "1.0.0",
-  "description": "Parser for SADL (System Architecture Description Language)",
+  "description": "SADL parser and interactive architecture visualizer",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,11 +13,12 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "node --experimental-strip-types test.ts"
+    "docker:build": "docker build -t sadlmap .",
+    "docker:run": "docker run -p 8080:80 sadlmap"
   },
   "devDependencies": {
     "typescript": "^5.3.0"
   },
-  "keywords": ["parser", "sadl", "architecture"],
+  "keywords": ["parser", "sadl", "architecture", "visualizer"],
   "license": "MIT"
 }
