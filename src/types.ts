@@ -58,7 +58,13 @@ export interface Connection extends BaseNode {
 
 export type ASTNode = NodeClass | LinkClass | Instance | Connection;
 
+export interface Include extends BaseNode {
+  kind: 'Include';
+  path: string;
+}
+
 export interface AST {
+  includes: Include[];
   nodeClasses: NodeClass[];
   linkClasses: LinkClass[];
   instances: Instance[];

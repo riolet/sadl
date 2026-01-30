@@ -1,18 +1,35 @@
 // Recursive descent parser for SADL
 
 import { Lexer, Token, TokenType } from './lexer.js';
-import { AST, NodeClass, LinkClass, Instance, Connection, Connector, PortSpec, InstanceEntry } from './types.js';
+import { AST, NodeClass, LinkClass, Instance, Connection, Connector, PortSpec, InstanceEntry, Include } from './types.js';
+
+export type FileResolver = (path: string, fromPath?: string) => string;
 
 export class Parser {
   private tokens: Token[] = [];
   private pos: number = 0;
+  private fileResolver?: FileResolver;
+  private currentPath?: string;
+  private includedPaths: Set<string> = new Set();
 
-  parse(input: string): AST {
+  parse(input: string, options?: { fileResolver?: FileResolver; filePath?: string }): AST {
+    this.fileResolver = options?.fileResolver;
+    this.currentPath = options?.filePath;
+    this.includedPaths = new Set();
+    if (this.currentPath) {
+      this.includedPaths.add(this.currentPath);
+    }
+
+    return this.parseContent(input);
+  }
+
+  private parseContent(input: string): AST {
     const lexer = new Lexer(input);
     this.tokens = lexer.tokenize();
     this.pos = 0;
 
     const ast: AST = {
+      includes: [],
       nodeClasses: [],
       linkClasses: [],
       instances: [],
@@ -22,7 +39,10 @@ export class Parser {
     while (!this.isAtEnd()) {
       const node = this.parseTopLevel();
       if (node) {
-        if (node.kind === 'NodeClass') {
+        if (node.kind === 'Include') {
+          ast.includes.push(node);
+          this.processInclude(node, ast);
+        } else if (node.kind === 'NodeClass') {
           ast.nodeClasses.push(node);
         } else if (node.kind === 'LinkClass') {
           ast.linkClasses.push(node);
@@ -35,6 +55,35 @@ export class Parser {
     }
 
     return ast;
+  }
+
+  private processInclude(include: Include, ast: AST): void {
+    if (!this.fileResolver) {
+      return; // No resolver, includes tracked but not processed
+    }
+
+    const resolvedPath = include.path;
+    if (this.includedPaths.has(resolvedPath)) {
+      return; // Already included, skip to avoid cycles
+    }
+    this.includedPaths.add(resolvedPath);
+
+    const content = this.fileResolver(resolvedPath, this.currentPath);
+    const savedTokens = this.tokens;
+    const savedPos = this.pos;
+    const savedPath = this.currentPath;
+
+    this.currentPath = resolvedPath;
+    const includedAst = this.parseContent(content);
+
+    // Merge included AST (only nodeClasses and linkClasses from libraries)
+    ast.nodeClasses.push(...includedAst.nodeClasses);
+    ast.linkClasses.push(...includedAst.linkClasses);
+
+    // Restore parser state
+    this.tokens = savedTokens;
+    this.pos = savedPos;
+    this.currentPath = savedPath;
   }
 
   private peek(): Token {
@@ -74,8 +123,10 @@ export class Parser {
     throw new Error(`${message} at line ${token.line}, column ${token.column}. Got ${token.type}`);
   }
 
-  private parseTopLevel(): NodeClass | LinkClass | Instance | Connection | null {
-    if (this.check('NODECLASS')) {
+  private parseTopLevel(): NodeClass | LinkClass | Instance | Connection | Include | null {
+    if (this.check('INCLUDE')) {
+      return this.parseInclude();
+    } else if (this.check('NODECLASS')) {
       return this.parseNodeClass();
     } else if (this.check('LINKCLASS')) {
       return this.parseLinkClass();
@@ -85,6 +136,17 @@ export class Parser {
       return this.parseInstance();
     }
     return null;
+  }
+
+  private parseInclude(): Include {
+    const startToken = this.expect('INCLUDE', 'Expected include');
+    const pathToken = this.expect('STRING', 'Expected file path string');
+
+    return {
+      kind: 'Include',
+      path: pathToken.value,
+      position: { line: startToken.line, column: startToken.column },
+    };
   }
 
   private parseNodeClass(): NodeClass {

@@ -1,6 +1,8 @@
 // Canvas-based visualizer for SADL AST
 
-import { AST, NodeClass, Instance, Connection } from './types.js';
+import { AST, NodeClass, Instance, Connection, LinkClass } from './types.js';
+
+export type ViewMode = 'instances' | 'schema';
 
 export interface NodePosition {
   x: number;
@@ -76,9 +78,11 @@ export class Visualizer {
   private options: ResolvedOptions;
   private instances: RenderedInstance[] = [];
   private connections: Connection[] = [];
+  private linkClasses: LinkClass[] = [];
   private draggedNode: RenderedInstance | null = null;
   private dragOffset = { x: 0, y: 0 };
   private ast: AST | null = null;
+  private viewMode: ViewMode = 'instances';
 
   // Viewport state for pan and zoom
   private viewport = { x: 0, y: 0, scale: 1 };
@@ -201,11 +205,18 @@ export class Visualizer {
     this.render();
   }
 
-  render(ast?: AST): void {
+  render(ast?: AST, mode?: ViewMode): void {
     if (ast) {
       this.ast = ast;
-      this.layoutInstances(ast);
-      this.connections = ast.connections;
+      this.viewMode = mode || (ast.instances.length > 0 ? 'instances' : 'schema');
+
+      if (this.viewMode === 'schema') {
+        this.layoutSchema(ast);
+        this.linkClasses = ast.linkClasses;
+      } else {
+        this.layoutInstances(ast);
+        this.connections = ast.connections;
+      }
       this.autoSizeCanvas();
     }
 
@@ -221,16 +232,188 @@ export class Visualizer {
     ctx.translate(this.viewport.x, this.viewport.y);
     ctx.scale(this.viewport.scale, this.viewport.scale);
 
-    // Draw connections first (behind nodes)
-    this.drawConnections();
+    // Draw connections/links first (behind nodes)
+    if (this.viewMode === 'schema') {
+      this.drawLinkClasses();
+    } else {
+      this.drawConnections();
+    }
 
-    // Draw instances
+    // Draw instances/node classes
     for (const instance of this.instances) {
       this.drawInstance(instance);
     }
 
     // Restore context
     ctx.restore();
+  }
+
+  private layoutSchema(ast: AST): void {
+    this.instances = [];
+
+    // Build adjacency info from link classes
+    const outgoing = new Map<string, string[]>(); // from nodeClass -> [to nodeClass]
+    const incoming = new Map<string, string[]>(); // to nodeClass -> [from nodeClass]
+
+    for (const nc of ast.nodeClasses) {
+      outgoing.set(nc.name, []);
+      incoming.set(nc.name, []);
+    }
+
+    for (const link of ast.linkClasses) {
+      outgoing.get(link.from.nodeClass)?.push(link.to.nodeClass);
+      incoming.get(link.to.nodeClass)?.push(link.from.nodeClass);
+    }
+
+    // Assign layers using longest path from sources
+    const layers = new Map<string, number>();
+    const visited = new Set<string>();
+
+    const assignLayer = (name: string): number => {
+      if (layers.has(name)) return layers.get(name)!;
+      if (visited.has(name)) return 0;
+      visited.add(name);
+
+      const incomingNodes = incoming.get(name) || [];
+      if (incomingNodes.length === 0) {
+        layers.set(name, 0);
+        return 0;
+      }
+
+      const maxParentLayer = Math.max(...incomingNodes.map(assignLayer));
+      const layer = maxParentLayer + 1;
+      layers.set(name, layer);
+      return layer;
+    };
+
+    for (const nc of ast.nodeClasses) {
+      assignLayer(nc.name);
+    }
+
+    // Group by layer
+    const layerGroups = new Map<number, NodeClass[]>();
+    for (const nc of ast.nodeClasses) {
+      const layer = layers.get(nc.name) || 0;
+      if (!layerGroups.has(layer)) {
+        layerGroups.set(layer, []);
+      }
+      layerGroups.get(layer)!.push(nc);
+    }
+
+    // Sort within layers to minimize crossings
+    const sortedLayers = Array.from(layerGroups.keys()).sort((a, b) => a - b);
+    const rowPositions = new Map<string, number>();
+
+    for (const layerIdx of sortedLayers) {
+      const layerNodes = layerGroups.get(layerIdx)!;
+
+      if (layerIdx === 0) {
+        layerNodes.sort((a, b) => a.name.localeCompare(b.name));
+        layerNodes.forEach((nc, i) => rowPositions.set(nc.name, i));
+      } else {
+        layerNodes.sort((a, b) => {
+          const aIncoming = incoming.get(a.name) || [];
+          const bIncoming = incoming.get(b.name) || [];
+          const aAvg = aIncoming.length > 0
+            ? aIncoming.reduce((sum, n) => sum + (rowPositions.get(n) || 0), 0) / aIncoming.length
+            : 0;
+          const bAvg = bIncoming.length > 0
+            ? bIncoming.reduce((sum, n) => sum + (rowPositions.get(n) || 0), 0) / bIncoming.length
+            : 0;
+          return aAvg - bAvg;
+        });
+        layerNodes.forEach((nc, i) => rowPositions.set(nc.name, i));
+      }
+    }
+
+    // Calculate positions
+    const { nodeWidth, nodeHeight, padding } = this.options;
+    const columnSpacing = nodeWidth + padding * 3;
+    const rowSpacing = nodeHeight + padding * 2;
+
+    for (const nodeClass of ast.nodeClasses) {
+      const layer = layers.get(nodeClass.name) || 0;
+      const row = rowPositions.get(nodeClass.name) || 0;
+
+      const connectorSpacing = 24;
+      const contentStart = 40;
+      const sercons = nodeClass.connectors.filter((c) => c.type === 'sercon');
+      const clicons = nodeClass.connectors.filter((c) => c.type === 'clicon');
+      const maxConnectors = Math.max(sercons.length, clicons.length);
+      const height = Math.max(
+        nodeHeight,
+        contentStart + maxConnectors * connectorSpacing + 15
+      );
+
+      const connectors = [
+        ...sercons.map((c, ci) => ({
+          name: c.name,
+          type: c.type as 'sercon' | 'clicon',
+          y: contentStart + ci * connectorSpacing,
+        })),
+        ...clicons.map((c, ci) => ({
+          name: c.name,
+          type: c.type as 'sercon' | 'clicon',
+          y: contentStart + ci * connectorSpacing,
+        })),
+      ];
+
+      this.instances.push({
+        name: nodeClass.name,
+        nodeClass,
+        position: {
+          x: padding + layer * columnSpacing,
+          y: padding + row * rowSpacing,
+          width: nodeWidth,
+          height,
+        },
+        connectors,
+      });
+    }
+  }
+
+  private drawLinkClasses(): void {
+    const { ctx, options } = this;
+    const { colors } = options;
+
+    for (const link of this.linkClasses) {
+      const fromInstance = this.instances.find((i) => i.name === link.from.nodeClass);
+      const toInstance = this.instances.find((i) => i.name === link.to.nodeClass);
+
+      if (!fromInstance || !toInstance) continue;
+
+      // Find the specific connectors
+      const fromConnector = fromInstance.connectors.find((c) => c.name === link.from.connector);
+      const toConnector = toInstance.connectors.find((c) => c.name === link.to.connector);
+
+      if (!fromConnector || !toConnector) continue;
+
+      const connectorRadius = 6;
+      const fromX = fromInstance.position.x + fromInstance.position.width + connectorRadius;
+      const fromY = fromInstance.position.y + fromConnector.y;
+      const toX = toInstance.position.x - connectorRadius;
+      const toY = toInstance.position.y + toConnector.y;
+
+      // Draw curved connection line
+      ctx.strokeStyle = colors.connection;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+
+      const midX = (fromX + toX) / 2;
+      ctx.bezierCurveTo(midX, fromY, midX, toY, toX, toY);
+      ctx.stroke();
+
+      // Draw arrow at end
+      const arrowSize = 8;
+      ctx.fillStyle = colors.connection;
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(toX - arrowSize, toY - arrowSize / 2);
+      ctx.lineTo(toX - arrowSize, toY + arrowSize / 2);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
 
   private autoSizeCanvas(): void {
@@ -428,17 +611,19 @@ export class Visualizer {
     ctx.quadraticCurveTo(position.x, position.y, position.x + 8, position.y);
     ctx.fill();
 
-    // Draw instance name
+    // Draw instance/class name
     ctx.fillStyle = colors.nodeText;
     ctx.font = `bold ${fontSize}px ${fontFamily}`;
     ctx.textAlign = 'center';
     ctx.fillText(name, position.x + position.width / 2, position.y + 18, position.width - 10);
 
-    // Draw node class name and optional IP (smaller)
-    ctx.font = `${fontSize - 2}px ${fontFamily}`;
-    ctx.fillStyle = colors.connectionText;
-    const subtitle = instance.ip ? `(${nodeClass.name}) ${instance.ip}` : `(${nodeClass.name})`;
-    ctx.fillText(subtitle, position.x + position.width / 2, position.y + 45, position.width - 10);
+    // Draw subtitle (node class name and optional IP) - only in instance mode
+    if (this.viewMode === 'instances') {
+      ctx.font = `${fontSize - 2}px ${fontFamily}`;
+      ctx.fillStyle = colors.connectionText;
+      const subtitle = instance.ip ? `(${nodeClass.name}) ${instance.ip}` : `(${nodeClass.name})`;
+      ctx.fillText(subtitle, position.x + position.width / 2, position.y + 45, position.width - 10);
+    }
 
     // Draw connectors on the edge
     ctx.font = `${fontSize - 2}px ${fontFamily}`;
