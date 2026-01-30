@@ -14,12 +14,30 @@ Define entity templates with connectors:
 
 ```sadl
 nodeclass web_server:
-    sercon https_listener (443, TCP)
-    clicon mysql_connector (3306, TCP)
+    *https_listener (443)
+    mysql_connector
 ```
 
-- `sercon` - Server connector (port, protocol) - listens for connections
-- `clicon` - Client connector (port, protocol) - initiates connections
+- `*name (port)` - Server connector (listens for connections)
+- `name` or `name (port)` - Client connector (initiates connections)
+
+Port is optional for client connectors (ephemeral ports).
+
+#### Multiple Ports and Ranges
+
+```sadl
+nodeclass proxy:
+    *ports (80, 443, 8000-8080)
+```
+
+#### UDP Protocol
+
+TCP is the default. Use `UDP()` wrapper for UDP:
+
+```sadl
+nodeclass dns_server:
+    *dns_listener (UDP(53))
+```
 
 ### Link Classes
 
@@ -31,10 +49,11 @@ linkclass (browser_client.https_connector, web_server.https_listener)
 
 ### Instantiation
 
-Create instances of node classes:
+Create instances of node classes, optionally with IP addresses:
 
 ```sadl
-web_server internal_web_server, external_web_server
+web_server internal_web_server(192.168.1.10), external_web_server(10.0.10.10)
+browser_client my_browser
 ```
 
 ### Connections
@@ -42,12 +61,30 @@ web_server internal_web_server, external_web_server
 Connect instances:
 
 ```sadl
-connect (internal_browser_client, internal_web_server)
+connect (my_browser, internal_web_server)
 ```
 
 ### Comments
 
 Lines starting with `#` are comments.
+
+## Visualization (sadlmap)
+
+SADL includes an interactive visualizer called sadlmap.
+
+### Run with Docker
+
+```bash
+docker run -p 8080:80 riolet/sadlmap
+```
+
+Then open http://localhost:8080
+
+### Features
+
+- Pan: drag on empty space
+- Zoom: mouse wheel
+- Drag nodes to reposition
 
 ## License
 
