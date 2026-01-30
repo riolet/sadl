@@ -250,18 +250,30 @@ connect (external_web_server, primary_mysql_server)</textarea>
       height: 600,
     });
 
+    let currentAst = null;
+
     function parseAndRender() {
       errorContainer.innerHTML = '';
       try {
-        const ast = parse(editor.value);
-        visualizer.render(ast, viewMode.value);
+        currentAst = parse(editor.value);
+
+        // Auto-select schema if no instances defined and mode not explicitly changed
+        if (currentAst.instances.length === 0 && viewMode.value === 'instances') {
+          viewMode.value = 'schema';
+        }
+
+        visualizer.render(currentAst, viewMode.value);
       } catch (e) {
         errorContainer.innerHTML = `<div class="error">${e.message}</div>`;
       }
     }
 
     parseBtn.addEventListener('click', parseAndRender);
-    viewMode.addEventListener('change', parseAndRender);
+    viewMode.addEventListener('change', () => {
+      if (currentAst) {
+        visualizer.render(currentAst, viewMode.value);
+      }
+    });
 
     // Parse on load
     parseAndRender();
