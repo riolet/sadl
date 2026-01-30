@@ -73,6 +73,15 @@
       background: #3db892;
     }
 
+    #view-mode {
+      background: #0f3460;
+      color: #e8e8e8;
+      border: 1px solid #4ecca3;
+      padding: 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
     #editor {
       flex: 1;
       background: #0d0d1a;
@@ -164,7 +173,13 @@
     <div class="editor-panel">
       <div class="editor-header">
         <h2>SADL Source</h2>
-        <button id="parse-btn">Parse & Render</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <select id="view-mode">
+            <option value="instances">Instances</option>
+            <option value="schema">Schema</option>
+          </select>
+          <button id="parse-btn">Parse & Render</button>
+        </div>
       </div>
       <textarea id="editor" spellcheck="false">nodeclass browser_client:
     https_connector
@@ -227,6 +242,7 @@ connect (external_web_server, primary_mysql_server)</textarea>
     const editor = document.getElementById('editor');
     const canvas = document.getElementById('canvas');
     const parseBtn = document.getElementById('parse-btn');
+    const viewMode = document.getElementById('view-mode');
     const errorContainer = document.getElementById('error-container');
 
     const visualizer = new Visualizer(canvas, {
@@ -238,13 +254,14 @@ connect (external_web_server, primary_mysql_server)</textarea>
       errorContainer.innerHTML = '';
       try {
         const ast = parse(editor.value);
-        visualizer.render(ast);
+        visualizer.render(ast, viewMode.value);
       } catch (e) {
         errorContainer.innerHTML = `<div class="error">${e.message}</div>`;
       }
     }
 
     parseBtn.addEventListener('click', parseAndRender);
+    viewMode.addEventListener('change', parseAndRender);
 
     // Parse on load
     parseAndRender();

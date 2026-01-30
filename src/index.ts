@@ -7,7 +7,7 @@ export { Parser } from './parser.js';
 export type { FileResolver } from './parser.js';
 
 export { Visualizer } from './visualizer.js';
-export type { VisualizerOptions, RenderedInstance, NodePosition } from './visualizer.js';
+export type { VisualizerOptions, RenderedInstance, NodePosition, ViewMode } from './visualizer.js';
 
 export type {
   AST,
