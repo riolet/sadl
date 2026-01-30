@@ -4,9 +4,11 @@ export type TokenType =
   | 'NODECLASS'
   | 'LINKCLASS'
   | 'CONNECT'
+  | 'INCLUDE'
   | 'UDP'
   | 'IDENTIFIER'
   | 'NUMBER'
+  | 'STRING'
   | 'LPAREN'
   | 'RPAREN'
   | 'COMMA'
@@ -27,6 +29,7 @@ const KEYWORDS: Record<string, TokenType> = {
   nodeclass: 'NODECLASS',
   linkclass: 'LINKCLASS',
   connect: 'CONNECT',
+  include: 'INCLUDE',
   udp: 'UDP',
 };
 
@@ -128,6 +131,17 @@ export class Lexer {
           line,
           column,
         });
+      } else if (char === '"') {
+        this.advance(); // consume opening quote
+        let str = '';
+        while (this.pos < this.input.length && this.peek() !== '"') {
+          str += this.advance();
+        }
+        if (this.peek() !== '"') {
+          throw new Error(`Unterminated string at line ${line}, column ${column}`);
+        }
+        this.advance(); // consume closing quote
+        tokens.push({ type: 'STRING', value: str, line, column });
       } else if (char === '(') {
         this.advance();
         tokens.push({ type: 'LPAREN', value: '(', line, column });

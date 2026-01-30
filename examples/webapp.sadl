@@ -1,0 +1,14 @@
+# Web application using the webstack library
+
+include "lib/webstack.sadl"
+
+# Instantiate the architecture
+browser user_browser
+web_server app_server(10.0.1.10)
+database postgres_primary(10.0.1.20)
+cache redis_cache(10.0.1.30)
+
+# Connections
+connect (user_browser, app_server)
+connect (app_server, postgres_primary)
+connect (app_server, redis_cache)
