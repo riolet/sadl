@@ -1,21 +1,22 @@
 # Web stack library - common node classes for web applications
 
-nodeclass browser:
+#nodeclass
+browser::
     http_connector
 
-nodeclass web_server:
-    *http_listener (80)
-    *https_listener (443)
+web_server::
+    http_listener (80)
+    https_listener (443)
     db_connector
 
-nodeclass database:
-    *db_listener (5432)
+database::
+    db_listener (5432)
 
-nodeclass cache:
-    *cache_listener (6379)
+cache::
+    cache_listener (6379)
 
-# Link classes
-linkclass (browser.http_connector, web_server.http_listener)
-linkclass (browser.http_connector, web_server.https_listener)
-linkclass (web_server.db_connector, database.db_listener)
-linkclass (web_server.db_connector, cache.cache_listener)
+#linkclass
+browser.http_connector -> web_server.http_listener
+browser.http_connector -> web_server.https_listener
+web_server.db_connector -> database.db_listener
+web_server.db_connector -> cache.cache_listener

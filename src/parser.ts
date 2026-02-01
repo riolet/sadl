@@ -5,12 +5,15 @@ import { AST, NodeClass, LinkClass, Instance, Connection, Connector, PortSpec, I
 
 export type FileResolver = (path: string, fromPath?: string) => string;
 
+type Section = 'nodeclass' | 'linkclass' | 'instances' | 'connections' | null;
+
 export class Parser {
   private tokens: Token[] = [];
   private pos: number = 0;
   private fileResolver?: FileResolver;
   private currentPath?: string;
   private includedPaths: Set<string> = new Set();
+  private currentSection: Section = null;
 
   parse(input: string, options?: { fileResolver?: FileResolver; filePath?: string }): AST {
     this.fileResolver = options?.fileResolver;
@@ -27,6 +30,7 @@ export class Parser {
     const lexer = new Lexer(input);
     this.tokens = lexer.tokenize();
     this.pos = 0;
+    this.currentSection = null;
 
     const ast: AST = {
       includes: [],
@@ -72,6 +76,7 @@ export class Parser {
     const savedTokens = this.tokens;
     const savedPos = this.pos;
     const savedPath = this.currentPath;
+    const savedSection = this.currentSection;
 
     this.currentPath = resolvedPath;
     const includedAst = this.parseContent(content);
@@ -84,6 +89,7 @@ export class Parser {
     this.tokens = savedTokens;
     this.pos = savedPos;
     this.currentPath = savedPath;
+    this.currentSection = savedSection;
   }
 
   private peek(): Token {
@@ -124,17 +130,46 @@ export class Parser {
   }
 
   private parseTopLevel(): NodeClass | LinkClass | Instance | Connection | Include | null {
+    // Handle section headers
+    if (this.check('SECTION_NODECLASS')) {
+      this.advance();
+      this.currentSection = 'nodeclass';
+      return null;
+    }
+    if (this.check('SECTION_LINKCLASS')) {
+      this.advance();
+      this.currentSection = 'linkclass';
+      return null;
+    }
+    if (this.check('SECTION_INSTANCES')) {
+      this.advance();
+      this.currentSection = 'instances';
+      return null;
+    }
+    if (this.check('SECTION_CONNECTIONS')) {
+      this.advance();
+      this.currentSection = 'connections';
+      return null;
+    }
+
+    // Handle include (can appear anywhere)
     if (this.check('INCLUDE')) {
       return this.parseInclude();
-    } else if (this.check('NODECLASS')) {
-      return this.parseNodeClass();
-    } else if (this.check('LINKCLASS')) {
-      return this.parseLinkClass();
-    } else if (this.check('CONNECT')) {
-      return this.parseConnection();
-    } else if (this.check('IDENTIFIER')) {
-      return this.parseInstance();
     }
+
+    // Parse based on current section
+    if (this.check('IDENTIFIER')) {
+      if (this.currentSection === 'nodeclass') {
+        return this.parseNodeClass();
+      } else if (this.currentSection === 'linkclass') {
+        return this.parseLinkClass();
+      } else if (this.currentSection === 'instances') {
+        return this.parseInstance();
+      } else if (this.currentSection === 'connections') {
+        return this.parseConnection();
+      }
+    }
+
     return null;
   }
 
@@ -150,14 +185,14 @@ export class Parser {
   }
 
   private parseNodeClass(): NodeClass {
-    const startToken = this.expect('NODECLASS', 'Expected nodeclass');
     const nameToken = this.expect('IDENTIFIER', 'Expected node class name');
-    this.expect('COLON', 'Expected colon after node class name');
+    const startToken = nameToken;
+    this.expect('DOUBLE_COLON', 'Expected :: after node class name');
 
     const connectors: Connector[] = [];
 
-    // Parse connectors: *name for server, name for client
-    while (this.check('STAR') || this.isConnectorStart()) {
+    // Parse connectors until we hit a section header or another node class definition
+    while (this.check('IDENTIFIER') && !this.isNodeClassStart()) {
       connectors.push(this.parseConnector());
     }
 
@@ -169,27 +204,23 @@ export class Parser {
     };
   }
 
-  // Check if current position looks like a connector start
-  private isConnectorStart(): boolean {
-    return this.check('IDENTIFIER');
+  // Check if we're at the start of a new node class definition (identifier followed by ::)
+  private isNodeClassStart(): boolean {
+    if (!this.check('IDENTIFIER')) return false;
+    // Look ahead to see if there's a :: after the identifier
+    const nextPos = this.pos + 1;
+    if (nextPos < this.tokens.length) {
+      return this.tokens[nextPos].type === 'DOUBLE_COLON';
+    }
+    return false;
   }
 
   private parseConnector(): Connector {
-    let type: 'sercon' | 'clicon' = 'clicon';
-    let startToken: Token;
-
-    // Check for * prefix (server connector)
-    if (this.match('STAR')) {
-      type = 'sercon';
-      startToken = this.tokens[this.pos - 1];
-    } else {
-      startToken = this.peek();
-    }
-
+    const startToken = this.peek();
     const nameToken = this.expect('IDENTIFIER', 'Expected connector name');
     const ports: PortSpec[] = [];
 
-    // Port specs are optional (client connectors can have no ports)
+    // Port specs are optional - presence of port determines sercon vs clicon
     if (this.match('LPAREN')) {
       // Parse port specifications
       do {
@@ -198,6 +229,9 @@ export class Parser {
 
       this.expect('RPAREN', 'Expected closing parenthesis');
     }
+
+    // Determine type based on presence of ports
+    const type: 'sercon' | 'clicon' = ports.length > 0 ? 'sercon' : 'clicon';
 
     return {
       type,
@@ -238,22 +272,20 @@ export class Parser {
   }
 
   private parseLinkClass(): LinkClass {
-    const startToken = this.expect('LINKCLASS', 'Expected linkclass');
-    this.expect('LPAREN', 'Expected opening parenthesis');
+    const startToken = this.peek();
 
     // Parse from: nodeClass.connector
     const fromNodeClass = this.expect('IDENTIFIER', 'Expected from node class');
     this.expect('DOT', 'Expected dot');
     const fromConnector = this.expect('IDENTIFIER', 'Expected from connector');
 
-    this.expect('COMMA', 'Expected comma');
+    // Arrow
+    this.expect('ARROW', 'Expected -> arrow');
 
     // Parse to: nodeClass.connector
     const toNodeClass = this.expect('IDENTIFIER', 'Expected to node class');
     this.expect('DOT', 'Expected dot');
     const toConnector = this.expect('IDENTIFIER', 'Expected to connector');
-
-    this.expect('RPAREN', 'Expected closing parenthesis');
 
     return {
       kind: 'LinkClass',
@@ -317,14 +349,12 @@ export class Parser {
   }
 
   private parseConnection(): Connection {
-    const startToken = this.expect('CONNECT', 'Expected connect');
-    this.expect('LPAREN', 'Expected opening parenthesis');
+    const startToken = this.peek();
 
+    // Parse: from -> to
     const fromToken = this.expect('IDENTIFIER', 'Expected from instance');
-    this.expect('COMMA', 'Expected comma');
+    this.expect('ARROW', 'Expected -> arrow');
     const toToken = this.expect('IDENTIFIER', 'Expected to instance');
-
-    this.expect('RPAREN', 'Expected closing parenthesis');
 
     return {
       kind: 'Connection',

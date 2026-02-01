@@ -181,34 +181,31 @@
           <button id="parse-btn">Parse & Render</button>
         </div>
       </div>
-      <textarea id="editor" spellcheck="false">nodeclass browser_client:
+      <textarea id="editor" spellcheck="false">#nodeclass
+browser_client::
     https_connector
 
-nodeclass web_server:
-    *https_listener (443)
+web_server::
+    https_listener (443)
     mysql_connector
 
-nodeclass mysql_server:
-    *mysql_listener (3306)
+mysql_server::
+    mysql_listener (3306)
 
+#linkclass
+browser_client.https_connector -> web_server.https_listener
+web_server.mysql_connector -> mysql_server.mysql_listener
 
-linkclass (browser_client.https_connector, web_server.https_listener)
-linkclass (web_server.mysql_connector, mysql_server.mysql_listener)
-
-#Instantiate web_server instances with IPs
+#instances
 web_server internal_web_server(192.168.1.10), external_web_server(10.0.10.10)
-
-#Instantiate browser_client instances
 browser_client internal_browser_client, external_browser_client
-
-#Instantiate mysql_server with IP
 mysql_server primary_mysql_server(192.168.1.11)
 
-
-connect (internal_browser_client, internal_web_server)
-connect (external_browser_client, external_web_server)
-connect (internal_web_server, primary_mysql_server)
-connect (external_web_server, primary_mysql_server)</textarea>
+#connections
+internal_browser_client -> internal_web_server
+external_browser_client -> external_web_server
+internal_web_server -> primary_mysql_server
+external_web_server -> primary_mysql_server</textarea>
     </div>
 
     <div class="canvas-panel">
@@ -217,14 +214,14 @@ connect (external_web_server, primary_mysql_server)</textarea>
         <div class="legend">
           <div class="legend-item">
             <div class="legend-dot sercon"></div>
-            <span>Server Connector (*)</span>
+            <span>Server Connector (has port)</span>
           </div>
           <div class="legend-item">
             <div class="legend-dot clicon"></div>
-            <span>Client Connector</span>
+            <span>Client Connector (no port)</span>
           </div>
           <div class="legend-item">
-            <span>📌 Drag nodes to reposition</span>
+            <span>Drag nodes to reposition</span>
           </div>
         </div>
       </div>

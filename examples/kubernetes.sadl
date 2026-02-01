@@ -1,119 +1,87 @@
 # Kubernetes Cluster Architecture
 
-# Control Plane Components
+#nodeclass
 
-nodeclass api_server:
-    *api_endpoint (6443)
+# Control Plane Components
+api_server::
+    api_endpoint (6443)
     etcd_client
 
-nodeclass etcd:
-    *etcd_server (2379)
-    *etcd_peer (2380)
+etcd::
+    etcd_server (2379)
+    etcd_peer (2380)
 
-nodeclass controller_manager:
+controller_manager::
     api_client
 
-nodeclass scheduler:
+scheduler::
     api_client
 
 # Worker Node Components
-
-nodeclass kubelet:
-    *health_endpoint (10250)
+kubelet::
+    health_endpoint (10250)
     api_client
 
-nodeclass kube_proxy:
+kube_proxy::
     api_client
-    *node_port (30000-32767)
+    node_port (30000-32767)
 
 # Workloads
-
-nodeclass pod:
-    *container_port (8080)
+pod::
+    container_port (8080)
     service_client
 
-nodeclass service:
-    *cluster_ip (80)
+service::
+    cluster_ip (80)
     pod_backend
 
 # External Access
-
-nodeclass ingress_controller:
-    *http_port (80)
-    *https_port (443)
+ingress_controller::
+    http_port (80)
+    https_port (443)
     service_backend
 
-nodeclass external_client:
+external_client::
     https_connector
 
+#linkclass
+api_server.etcd_client -> etcd.etcd_server
+controller_manager.api_client -> api_server.api_endpoint
+scheduler.api_client -> api_server.api_endpoint
+kubelet.api_client -> api_server.api_endpoint
+kube_proxy.api_client -> api_server.api_endpoint
+service.pod_backend -> pod.container_port
+ingress_controller.service_backend -> service.cluster_ip
+external_client.https_connector -> ingress_controller.https_port
+pod.service_client -> service.cluster_ip
 
-# Link Classes
-
-linkclass (api_server.etcd_client, etcd.etcd_server)
-linkclass (controller_manager.api_client, api_server.api_endpoint)
-linkclass (scheduler.api_client, api_server.api_endpoint)
-linkclass (kubelet.api_client, api_server.api_endpoint)
-linkclass (kube_proxy.api_client, api_server.api_endpoint)
-linkclass (service.pod_backend, pod.container_port)
-linkclass (ingress_controller.service_backend, service.cluster_ip)
-linkclass (external_client.https_connector, ingress_controller.https_port)
-linkclass (pod.service_client, service.cluster_ip)
-
-
-# Control Plane Instances
-
+#instances
 api_server kube_apiserver
 etcd etcd_0, etcd_1, etcd_2
 controller_manager kube_controller_manager
 scheduler kube_scheduler
-
-# Worker Node Instances (2 nodes)
-
 kubelet kubelet_node1, kubelet_node2
 kube_proxy kube_proxy_node1, kube_proxy_node2
-
-# Workload Instances
-
 pod frontend_pod_1, frontend_pod_2
 pod backend_pod_1, backend_pod_2
 service frontend_service
 service backend_service
 ingress_controller nginx_ingress
-
-# External
-
 external_client user_browser
 
-
-# Connections
-
-# Control plane to etcd
-connect (kube_apiserver, etcd_0)
-
-# Controllers to API server
-connect (kube_controller_manager, kube_apiserver)
-connect (kube_scheduler, kube_apiserver)
-
-# Kubelets to API server
-connect (kubelet_node1, kube_apiserver)
-connect (kubelet_node2, kube_apiserver)
-
-# Kube-proxy to API server
-connect (kube_proxy_node1, kube_apiserver)
-connect (kube_proxy_node2, kube_apiserver)
-
-# Services to pods
-connect (frontend_service, frontend_pod_1)
-connect (frontend_service, frontend_pod_2)
-connect (backend_service, backend_pod_1)
-connect (backend_service, backend_pod_2)
-
-# Pod to service communication
-connect (frontend_pod_1, backend_service)
-connect (frontend_pod_2, backend_service)
-
-# Ingress to services
-connect (nginx_ingress, frontend_service)
-
-# External to ingress
-connect (user_browser, nginx_ingress)
+#connections
+kube_apiserver -> etcd_0
+kube_controller_manager -> kube_apiserver
+kube_scheduler -> kube_apiserver
+kubelet_node1 -> kube_apiserver
+kubelet_node2 -> kube_apiserver
+kube_proxy_node1 -> kube_apiserver
+kube_proxy_node2 -> kube_apiserver
+frontend_service -> frontend_pod_1
+frontend_service -> frontend_pod_2
+backend_service -> backend_pod_1
+backend_service -> backend_pod_2
+frontend_pod_1 -> backend_service
+frontend_pod_2 -> backend_service
+nginx_ingress -> frontend_service
+user_browser -> nginx_ingress
