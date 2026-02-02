@@ -183,11 +183,11 @@
       </div>
       <textarea id="editor" spellcheck="false">#nodeclass
 browser_client::
-    https_connector
+    *https_connector
 
 web_server::
     https_listener (443)
-    mysql_connector
+    *mysql_connector
 
 mysql_server::
     mysql_listener (3306)
@@ -214,11 +214,11 @@ external_web_server -> primary_mysql_server</textarea>
         <div class="legend">
           <div class="legend-item">
             <div class="legend-dot sercon"></div>
-            <span>Server Connector (has port)</span>
+            <span>Server Connector</span>
           </div>
           <div class="legend-item">
             <div class="legend-dot clicon"></div>
-            <span>Client Connector (no port)</span>
+            <span>Client Connector (*)</span>
           </div>
           <div class="legend-item">
             <span>Drag nodes to reposition</span>

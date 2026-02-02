@@ -18,13 +18,13 @@ Define entity templates with connectors:
 #nodeclass
 web_server::
     https_listener (443)
-    mysql_connector
+    *mysql_connector
 ```
 
-- `name (port)` - Server connector (has a port, listens for connections)
-- `name` - Client connector (no port, initiates connections)
+- `name` or `name (port)` - Server connector (listens for connections)
+- `*name` - Client connector (initiates connections)
 
-The connector type is determined by whether a port is specified.
+Client connectors are prefixed with `*`.
 
 #### Multiple Ports and Ranges
 
@@ -89,11 +89,11 @@ include "lib/webstack.sadl"
 ```sadl
 #nodeclass
 browser_client::
-    https_connector
+    *https_connector
 
 web_server::
     https_listener (443)
-    mysql_connector
+    *mysql_connector
 
 mysql_server::
     mysql_listener (3306)

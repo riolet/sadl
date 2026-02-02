@@ -17,6 +17,7 @@ export type TokenType =
   | 'DOT'
   | 'ARROW'
   | 'DASH'
+  | 'STAR'
   | 'EOF';
 
 export interface Token {
@@ -182,6 +183,9 @@ export class Lexer {
       } else if (char === '-') {
         this.advance();
         tokens.push({ type: 'DASH', value: '-', line, column });
+      } else if (char === '*') {
+        this.advance();
+        tokens.push({ type: 'STAR', value: '*', line, column });
       } else {
         throw new Error(`Unexpected character '${char}' at line ${line}, column ${column}`);
       }

@@ -5,44 +5,44 @@
 # Control Plane Components
 api_server::
     api_endpoint (6443)
-    etcd_client
+    *etcd_client
 
 etcd::
     etcd_server (2379)
     etcd_peer (2380)
 
 controller_manager::
-    api_client
+    *api_client
 
 scheduler::
-    api_client
+    *api_client
 
 # Worker Node Components
 kubelet::
     health_endpoint (10250)
-    api_client
+    *api_client
 
 kube_proxy::
-    api_client
+    *api_client
     node_port (30000-32767)
 
 # Workloads
 pod::
     container_port (8080)
-    service_client
+    *service_client
 
 service::
     cluster_ip (80)
-    pod_backend
+    *pod_backend
 
 # External Access
 ingress_controller::
     http_port (80)
     https_port (443)
-    service_backend
+    *service_backend
 
 external_client::
-    https_connector
+    *https_connector
 
 #linkclass
 api_server.etcd_client -> etcd.etcd_server

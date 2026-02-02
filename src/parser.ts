@@ -192,7 +192,8 @@ export class Parser {
     const connectors: Connector[] = [];
 
     // Parse connectors until we hit a section header or another node class definition
-    while (this.check('IDENTIFIER') && !this.isNodeClassStart()) {
+    // Connectors can start with * (client) or identifier (server)
+    while ((this.check('IDENTIFIER') || this.check('STAR')) && !this.isNodeClassStart()) {
       connectors.push(this.parseConnector());
     }
 
@@ -215,12 +216,23 @@ export class Parser {
     return false;
   }
 
+  // Check if current position is at a connector (not a node class start)
+  private isConnectorStart(): boolean {
+    if (this.check('STAR')) return true;
+    if (this.check('IDENTIFIER') && !this.isNodeClassStart()) return true;
+    return false;
+  }
+
   private parseConnector(): Connector {
     const startToken = this.peek();
+
+    // Check for * prefix (client connector)
+    const isClient = this.match('STAR');
+
     const nameToken = this.expect('IDENTIFIER', 'Expected connector name');
     const ports: PortSpec[] = [];
 
-    // Port specs are optional - presence of port determines sercon vs clicon
+    // Port specs are optional for server connectors
     if (this.match('LPAREN')) {
       // Parse port specifications
       do {
@@ -230,8 +242,8 @@ export class Parser {
       this.expect('RPAREN', 'Expected closing parenthesis');
     }
 
-    // Determine type based on presence of ports
-    const type: 'sercon' | 'clicon' = ports.length > 0 ? 'sercon' : 'clicon';
+    // * prefix means client connector, otherwise server connector
+    const type: 'sercon' | 'clicon' = isClient ? 'clicon' : 'sercon';
 
     return {
       type,

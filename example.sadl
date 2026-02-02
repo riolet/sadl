@@ -1,10 +1,10 @@
 #nodeclass
 browser_client::
-    https_connector
+    *https_connector
 
 web_server::
     https_listener (443)
-    mysql_connector
+    *mysql_connector
 
 mysql_server::
     mysql_listener (3306)
