@@ -27,15 +27,15 @@ function toMermaidSchema(ast: AST, direction: string): string {
   // Create subgraphs for each node class with their connectors
   for (const nodeClass of ast.nodeClasses) {
     const nodeId = sanitizeId(nodeClass.name);
-    lines.push(`    subgraph ${nodeId}[${nodeClass.name}]`);
+    lines.push(`    subgraph ${nodeId}["${escapeLabel(nodeClass.name)}"]`);
 
     for (const connector of nodeClass.connectors) {
       const connId = `${nodeId}_${sanitizeId(connector.name)}`;
       const portInfo = connector.ports.length > 0
-        ? ` (${connector.ports.map(p => p.port || `${p.portRange?.start}-${p.portRange?.end}`).join(', ')})`
+        ? ` :${connector.ports.map(p => p.port || `${p.portRange?.start}-${p.portRange?.end}`).join(', ')}`
         : '';
-      const prefix = connector.type === 'clicon' ? '*' : '';
-      lines.push(`        ${connId}[${prefix}${connector.name}${portInfo}]`);
+      const prefix = connector.type === 'clicon' ? '* ' : '';
+      lines.push(`        ${connId}["${escapeLabel(prefix + connector.name + portInfo)}"]`);
     }
 
     lines.push(`    end`);
@@ -69,7 +69,7 @@ function toMermaidInstances(ast: AST, direction: string): string {
       const label = entry.ip
         ? `${entry.name}<br/>${entry.ip}`
         : entry.name;
-      lines.push(`    ${nodeId}[${label}]`);
+      lines.push(`    ${nodeId}["${escapeLabel(label)}"]`);
     }
   }
 
@@ -88,4 +88,12 @@ function toMermaidInstances(ast: AST, direction: string): string {
  */
 function sanitizeId(name: string): string {
   return name.replace(/[^a-zA-Z0-9_]/g, '_');
+}
+
+/**
+ * Escape special characters in Mermaid labels
+ */
+function escapeLabel(label: string): string {
+  // Escape quotes and other problematic characters
+  return label.replace(/"/g, '&quot;');
 }
