@@ -1,9 +1,10 @@
 // Lexer for SADL
 
 export type TokenType =
-  | 'NODECLASS'
-  | 'LINKCLASS'
-  | 'CONNECT'
+  | 'SECTION_NODECLASS'
+  | 'SECTION_LINKCLASS'
+  | 'SECTION_INSTANCES'
+  | 'SECTION_CONNECTIONS'
   | 'INCLUDE'
   | 'UDP'
   | 'IDENTIFIER'
@@ -12,10 +13,11 @@ export type TokenType =
   | 'LPAREN'
   | 'RPAREN'
   | 'COMMA'
-  | 'COLON'
+  | 'DOUBLE_COLON'
   | 'DOT'
-  | 'STAR'
+  | 'ARROW'
   | 'DASH'
+  | 'STAR'
   | 'EOF';
 
 export interface Token {
@@ -26,11 +28,15 @@ export interface Token {
 }
 
 const KEYWORDS: Record<string, TokenType> = {
-  nodeclass: 'NODECLASS',
-  linkclass: 'LINKCLASS',
-  connect: 'CONNECT',
   include: 'INCLUDE',
   udp: 'UDP',
+};
+
+const SECTION_KEYWORDS: Record<string, TokenType> = {
+  nodeclass: 'SECTION_NODECLASS',
+  linkclass: 'SECTION_LINKCLASS',
+  instances: 'SECTION_INSTANCES',
+  connections: 'SECTION_CONNECTIONS',
 };
 
 export class Lexer {
@@ -43,8 +49,8 @@ export class Lexer {
     this.input = input;
   }
 
-  private peek(): string {
-    return this.input[this.pos] || '';
+  private peek(offset: number = 0): string {
+    return this.input[this.pos + offset] || '';
   }
 
   private advance(): string {
@@ -63,14 +69,16 @@ export class Lexer {
       const char = this.peek();
       if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
         this.advance();
-      } else if (char === '#') {
-        // Skip comment until end of line
-        while (this.pos < this.input.length && this.peek() !== '\n') {
-          this.advance();
-        }
       } else {
         break;
       }
+    }
+  }
+
+  private skipComment(): void {
+    // Skip until end of line
+    while (this.pos < this.input.length && this.peek() !== '\n') {
+      this.advance();
     }
   }
 
@@ -114,7 +122,17 @@ export class Lexer {
       const column = this.column;
       const char = this.peek();
 
-      if (/[a-zA-Z_]/.test(char)) {
+      if (char === '#') {
+        this.advance(); // consume #
+        const identifier = this.readIdentifier();
+        const sectionType = SECTION_KEYWORDS[identifier.toLowerCase()];
+        if (sectionType) {
+          tokens.push({ type: sectionType, value: identifier, line, column });
+        } else {
+          // It's a comment, skip to end of line
+          this.skipComment();
+        }
+      } else if (/[a-zA-Z_]/.test(char)) {
         const identifier = this.readIdentifier();
         const keyword = KEYWORDS[identifier.toLowerCase()];
         tokens.push({
@@ -151,18 +169,23 @@ export class Lexer {
       } else if (char === ',') {
         this.advance();
         tokens.push({ type: 'COMMA', value: ',', line, column });
-      } else if (char === ':') {
+      } else if (char === ':' && this.peek(1) === ':') {
         this.advance();
-        tokens.push({ type: 'COLON', value: ':', line, column });
+        this.advance();
+        tokens.push({ type: 'DOUBLE_COLON', value: '::', line, column });
       } else if (char === '.') {
         this.advance();
         tokens.push({ type: 'DOT', value: '.', line, column });
-      } else if (char === '*') {
+      } else if (char === '-' && this.peek(1) === '>') {
         this.advance();
-        tokens.push({ type: 'STAR', value: '*', line, column });
+        this.advance();
+        tokens.push({ type: 'ARROW', value: '->', line, column });
       } else if (char === '-') {
         this.advance();
         tokens.push({ type: 'DASH', value: '-', line, column });
+      } else if (char === '*') {
+        this.advance();
+        tokens.push({ type: 'STAR', value: '*', line, column });
       } else {
         throw new Error(`Unexpected character '${char}' at line ${line}, column ${column}`);
       }

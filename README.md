@@ -8,26 +8,29 @@ SADL is a language for describing and designing system architectures. It models 
 
 ## Syntax
 
+SADL files are organized into sections: `#nodeclass`, `#linkclass`, `#instances`, and `#connections`.
+
 ### Node Classes
 
 Define entity templates with connectors:
 
 ```sadl
-nodeclass web_server:
-    *https_listener (443)
-    mysql_connector
+#nodeclass
+web_server::
+    https_listener (443)
+    *mysql_connector
 ```
 
-- `*name (port)` - Server connector (listens for connections)
-- `name` or `name (port)` - Client connector (initiates connections)
+- `name` or `name (port)` - Server connector (listens for connections)
+- `*name` - Client connector (initiates connections)
 
-Port is optional for client connectors (ephemeral ports).
+Client connectors are prefixed with `*`.
 
 #### Multiple Ports and Ranges
 
 ```sadl
-nodeclass proxy:
-    *ports (80, 443, 8000-8080)
+proxy::
+    ports (80, 443, 8000-8080)
 ```
 
 #### UDP Protocol
@@ -35,38 +38,79 @@ nodeclass proxy:
 TCP is the default. Use `UDP()` wrapper for UDP:
 
 ```sadl
-nodeclass dns_server:
-    *dns_listener (UDP(53))
+dns_server::
+    dns_listener (UDP(53))
 ```
 
 ### Link Classes
 
-Define valid connection patterns between connector types:
+Define valid connection patterns between connector types using arrow syntax:
 
 ```sadl
-linkclass (browser_client.https_connector, web_server.https_listener)
+#linkclass
+browser_client.https_connector -> web_server.https_listener
+web_server.mysql_connector -> mysql_server.mysql_listener
 ```
 
-### Instantiation
+### Instances
 
 Create instances of node classes, optionally with IP addresses:
 
 ```sadl
+#instances
 web_server internal_web_server(192.168.1.10), external_web_server(10.0.10.10)
 browser_client my_browser
 ```
 
 ### Connections
 
-Connect instances:
+Connect instances using arrow syntax:
 
 ```sadl
-connect (my_browser, internal_web_server)
+#connections
+my_browser -> internal_web_server
+internal_web_server -> primary_mysql_server
 ```
 
 ### Comments
 
-Lines starting with `#` are comments.
+Lines starting with `#` (other than section headers) are comments.
+
+### Include
+
+Include other SADL files to reuse definitions:
+
+```sadl
+include "lib/webstack.sadl"
+```
+
+## Complete Example
+
+```sadl
+#nodeclass
+browser_client::
+    *https_connector
+
+web_server::
+    https_listener (443)
+    *mysql_connector
+
+mysql_server::
+    mysql_listener (3306)
+
+#linkclass
+browser_client.https_connector -> web_server.https_listener
+web_server.mysql_connector -> mysql_server.mysql_listener
+
+#instances
+web_server internal_web_server(192.168.1.10)
+browser_client my_browser
+mysql_server primary_db(192.168.1.11)
+
+#connections
+my_browser -> internal_web_server
+internal_web_server -> primary_db
+```
 
 ## Visualization (sadlmap)
 
@@ -82,6 +126,8 @@ Then open http://localhost:8080
 
 ### Features
 
+- **Schema view**: Visualize node classes and link classes
+- **Instance view**: Visualize deployed instances and connections
 - Pan: drag on empty space
 - Zoom: mouse wheel
 - Drag nodes to reposition
