@@ -2,6 +2,7 @@
 export { Lexer } from './lexer.js';
 export { Parser } from './parser.js';
 export { Visualizer } from './visualizer.js';
+export { toMermaid } from './mermaid.js';
 import { Parser } from './parser.js';
 /**
  * Parse SADL source code into an AST

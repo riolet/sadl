@@ -162,6 +162,108 @@
     .legend-dot.clicon {
       background: #ff6b6b;
     }
+
+    #export-btn {
+      background: #0f3460;
+      color: #e8e8e8;
+      border: 1px solid #4ecca3;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    #export-btn:hover {
+      background: #1a4a7a;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 1.5rem;
+      width: 600px;
+      max-width: 90%;
+      max-height: 80%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .modal-header h3 {
+      font-size: 1.1rem;
+      font-weight: 500;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #e8e8e8;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    #mermaid-output {
+      flex: 1;
+      background: #0d0d1a;
+      color: #e8e8e8;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      padding: 1rem;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      resize: none;
+      min-height: 300px;
+    }
+
+    .modal-actions {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .modal-actions button {
+      background: #4ecca3;
+      color: #1a1a2e;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .modal-actions button:hover {
+      background: #3db892;
+    }
+
+    .copied {
+      background: #2ecc71 !important;
+    }
   </style>
 </head>
 <body>
@@ -179,6 +281,7 @@
             <option value="schema">Schema</option>
           </select>
           <button id="parse-btn">Parse & Render</button>
+          <button id="export-btn">Export Mermaid</button>
         </div>
       </div>
       <textarea id="editor" spellcheck="false">#nodeclass
@@ -232,15 +335,34 @@ external_web_server -> primary_mysql_server</textarea>
     </div>
   </div>
 
+  <div id="export-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Mermaid Diagram</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <textarea id="mermaid-output" readonly></textarea>
+      <div class="modal-actions">
+        <button id="copy-btn">Copy to Clipboard</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { parse } from './dist/index.js';
     import { Visualizer } from './dist/visualizer.js';
+    import { toMermaid } from './dist/mermaid.js';
 
     const editor = document.getElementById('editor');
     const canvas = document.getElementById('canvas');
     const parseBtn = document.getElementById('parse-btn');
+    const exportBtn = document.getElementById('export-btn');
     const viewMode = document.getElementById('view-mode');
     const errorContainer = document.getElementById('error-container');
+    const exportModal = document.getElementById('export-modal');
+    const mermaidOutput = document.getElementById('mermaid-output');
+    const copyBtn = document.getElementById('copy-btn');
+    const modalClose = document.querySelector('.modal-close');
 
     const visualizer = new Visualizer(canvas, {
       width: 1000,
@@ -270,6 +392,35 @@ external_web_server -> primary_mysql_server</textarea>
       if (currentAst) {
         visualizer.render(currentAst, viewMode.value);
       }
+    });
+
+    exportBtn.addEventListener('click', () => {
+      if (currentAst) {
+        const mermaid = toMermaid(currentAst, viewMode.value);
+        mermaidOutput.value = mermaid;
+        exportModal.classList.add('active');
+      }
+    });
+
+    modalClose.addEventListener('click', () => {
+      exportModal.classList.remove('active');
+    });
+
+    exportModal.addEventListener('click', (e) => {
+      if (e.target === exportModal) {
+        exportModal.classList.remove('active');
+      }
+    });
+
+    copyBtn.addEventListener('click', () => {
+      mermaidOutput.select();
+      navigator.clipboard.writeText(mermaidOutput.value);
+      copyBtn.textContent = 'Copied!';
+      copyBtn.classList.add('copied');
+      setTimeout(() => {
+        copyBtn.textContent = 'Copy to Clipboard';
+        copyBtn.classList.remove('copied');
+      }, 2000);
     });
 
     // Parse on load
