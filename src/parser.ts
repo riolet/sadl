@@ -1,11 +1,11 @@
 // Recursive descent parser for SADL
 
 import { Lexer, Token, TokenType } from './lexer.js';
-import { AST, NodeClass, LinkClass, Instance, Connection, Connector, PortSpec, InstanceEntry, Include } from './types.js';
+import { AST, NodeClass, LinkClass, Instance, Connection, Connector, PortSpec, InstanceEntry, Include, NAT } from './types.js';
 
 export type FileResolver = (path: string, fromPath?: string) => string;
 
-type Section = 'nodeclass' | 'linkclass' | 'instances' | 'connections' | null;
+type Section = 'nodeclass' | 'linkclass' | 'instances' | 'nats' | 'connections' | null;
 
 export class Parser {
   private tokens: Token[] = [];
@@ -37,6 +37,7 @@ export class Parser {
       nodeClasses: [],
       linkClasses: [],
       instances: [],
+      nats: [],
       connections: [],
     };
 
@@ -52,6 +53,8 @@ export class Parser {
           ast.linkClasses.push(node);
         } else if (node.kind === 'Instance') {
           ast.instances.push(node);
+        } else if (node.kind === 'NAT') {
+          ast.nats.push(node);
         } else if (node.kind === 'Connection') {
           ast.connections.push(node);
         }
@@ -129,7 +132,7 @@ export class Parser {
     throw new Error(`${message} at line ${token.line}, column ${token.column}. Got ${token.type}`);
   }
 
-  private parseTopLevel(): NodeClass | LinkClass | Instance | Connection | Include | null {
+  private parseTopLevel(): NodeClass | LinkClass | Instance | Connection | Include | NAT | null {
     // Handle section headers
     if (this.check('SECTION_NODECLASS')) {
       this.advance();
@@ -146,6 +149,11 @@ export class Parser {
       this.currentSection = 'instances';
       return null;
     }
+    if (this.check('SECTION_NATS')) {
+      this.advance();
+      this.currentSection = 'nats';
+      return null;
+    }
     if (this.check('SECTION_CONNECTIONS')) {
       this.advance();
       this.currentSection = 'connections';
@@ -158,16 +166,16 @@ export class Parser {
     }
 
     // Parse based on current section
-    if (this.check('IDENTIFIER')) {
-      if (this.currentSection === 'nodeclass') {
-        return this.parseNodeClass();
-      } else if (this.currentSection === 'linkclass') {
-        return this.parseLinkClass();
-      } else if (this.currentSection === 'instances') {
-        return this.parseInstance();
-      } else if (this.currentSection === 'connections') {
-        return this.parseConnection();
-      }
+    if (this.currentSection === 'nodeclass' && this.check('IDENTIFIER')) {
+      return this.parseNodeClass();
+    } else if (this.currentSection === 'linkclass' && this.check('IDENTIFIER')) {
+      return this.parseLinkClass();
+    } else if (this.currentSection === 'instances' && this.check('IDENTIFIER')) {
+      return this.parseInstance();
+    } else if (this.currentSection === 'nats' && this.check('AT')) {
+      return this.parseNAT();
+    } else if (this.currentSection === 'connections' && this.check('IDENTIFIER')) {
+      return this.parseConnection();
     }
 
     return null;
@@ -358,6 +366,25 @@ export class Parser {
     }
 
     return parts.join('.');
+  }
+
+  private parseNAT(): NAT {
+    const startToken = this.expect('AT', 'Expected @ for NAT');
+    const nameToken = this.expect('IDENTIFIER', 'Expected NAT name');
+
+    this.expect('LPAREN', 'Expected opening parenthesis');
+    const externalIp = this.parseIPAddress();
+    this.expect('COMMA', 'Expected comma between IPs');
+    const internalIp = this.parseIPAddress();
+    this.expect('RPAREN', 'Expected closing parenthesis');
+
+    return {
+      kind: 'NAT',
+      name: nameToken.value,
+      externalIp,
+      internalIp,
+      position: { line: startToken.line, column: startToken.column },
+    };
   }
 
   private parseConnection(): Connection {

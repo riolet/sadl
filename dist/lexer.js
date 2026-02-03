@@ -8,6 +8,7 @@ const SECTION_KEYWORDS = {
     linkclass: 'SECTION_LINKCLASS',
     instances: 'SECTION_INSTANCES',
     connections: 'SECTION_CONNECTIONS',
+    nats: 'SECTION_NATS',
 };
 export class Lexer {
     constructor(input) {
@@ -159,6 +160,10 @@ export class Lexer {
             else if (char === '*') {
                 this.advance();
                 tokens.push({ type: 'STAR', value: '*', line, column });
+            }
+            else if (char === '@') {
+                this.advance();
+                tokens.push({ type: 'AT', value: '@', line, column });
             }
             else {
                 throw new Error(`Unexpected character '${char}' at line ${line}, column ${column}`);

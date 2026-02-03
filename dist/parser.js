@@ -26,6 +26,7 @@ export class Parser {
             nodeClasses: [],
             linkClasses: [],
             instances: [],
+            nats: [],
             connections: [],
         };
         while (!this.isAtEnd()) {
@@ -43,6 +44,9 @@ export class Parser {
                 }
                 else if (node.kind === 'Instance') {
                     ast.instances.push(node);
+                }
+                else if (node.kind === 'NAT') {
+                    ast.nats.push(node);
                 }
                 else if (node.kind === 'Connection') {
                     ast.connections.push(node);
@@ -124,6 +128,11 @@ export class Parser {
             this.currentSection = 'instances';
             return null;
         }
+        if (this.check('SECTION_NATS')) {
+            this.advance();
+            this.currentSection = 'nats';
+            return null;
+        }
         if (this.check('SECTION_CONNECTIONS')) {
             this.advance();
             this.currentSection = 'connections';
@@ -134,19 +143,20 @@ export class Parser {
             return this.parseInclude();
         }
         // Parse based on current section
-        if (this.check('IDENTIFIER')) {
-            if (this.currentSection === 'nodeclass') {
-                return this.parseNodeClass();
-            }
-            else if (this.currentSection === 'linkclass') {
-                return this.parseLinkClass();
-            }
-            else if (this.currentSection === 'instances') {
-                return this.parseInstance();
-            }
-            else if (this.currentSection === 'connections') {
-                return this.parseConnection();
-            }
+        if (this.currentSection === 'nodeclass' && this.check('IDENTIFIER')) {
+            return this.parseNodeClass();
+        }
+        else if (this.currentSection === 'linkclass' && this.check('IDENTIFIER')) {
+            return this.parseLinkClass();
+        }
+        else if (this.currentSection === 'instances' && this.check('IDENTIFIER')) {
+            return this.parseInstance();
+        }
+        else if (this.currentSection === 'nats' && this.check('AT')) {
+            return this.parseNAT();
+        }
+        else if (this.currentSection === 'connections' && this.check('IDENTIFIER')) {
+            return this.parseConnection();
         }
         return null;
     }
@@ -302,6 +312,22 @@ export class Parser {
             parts.push(octet.value);
         }
         return parts.join('.');
+    }
+    parseNAT() {
+        const startToken = this.expect('AT', 'Expected @ for NAT');
+        const nameToken = this.expect('IDENTIFIER', 'Expected NAT name');
+        this.expect('LPAREN', 'Expected opening parenthesis');
+        const externalIp = this.parseIPAddress();
+        this.expect('COMMA', 'Expected comma between IPs');
+        const internalIp = this.parseIPAddress();
+        this.expect('RPAREN', 'Expected closing parenthesis');
+        return {
+            kind: 'NAT',
+            name: nameToken.value,
+            externalIp,
+            internalIp,
+            position: { line: startToken.line, column: startToken.column },
+        };
     }
     parseConnection() {
         const startToken = this.peek();

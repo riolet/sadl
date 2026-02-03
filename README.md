@@ -8,7 +8,7 @@ SADL is a language for describing and designing system architectures. It models 
 
 ## Syntax
 
-SADL files are organized into sections: `#nodeclass`, `#linkclass`, `#instances`, and `#connections`.
+SADL files are organized into sections: `#nodeclass`, `#linkclass`, `#instances`, `#NATs`, and `#connections`.
 
 ### Node Classes
 
@@ -60,6 +60,22 @@ Create instances of node classes, optionally with IP addresses:
 #instances
 web_server internal_web_server(192.168.1.10), external_web_server(10.0.10.10)
 browser_client my_browser
+```
+
+### NATs
+
+Define NAT (Network Address Translation) entries that map external IPs to internal IPs:
+
+```sadl
+#NATs
+@public_web_nat (203.0.113.10, 192.168.1.10)
+```
+
+NAT names are prefixed with `@` and can be used as connection targets:
+
+```sadl
+#connections
+external_client -> public_web_nat
 ```
 
 ### Connections

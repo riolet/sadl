@@ -62,6 +62,12 @@ function toMermaidInstances(ast: AST, direction: string): string {
     }
   }
 
+  // Build a map of NAT name to NAT info
+  const natMap = new Map<string, { externalIp: string; internalIp: string }>();
+  for (const nat of ast.nats) {
+    natMap.set(nat.name, { externalIp: nat.externalIp, internalIp: nat.internalIp });
+  }
+
   // Create nodes for each instance
   for (const inst of ast.instances) {
     for (const entry of inst.instances) {
@@ -71,6 +77,13 @@ function toMermaidInstances(ast: AST, direction: string): string {
         : entry.name;
       lines.push(`    ${nodeId}["${escapeLabel(label)}"]`);
     }
+  }
+
+  // Create nodes for NATs (shown as hexagons)
+  for (const nat of ast.nats) {
+    const nodeId = sanitizeId(nat.name);
+    const label = `NAT<br/>${nat.externalIp}`;
+    lines.push(`    ${nodeId}{{{"${escapeLabel(label)}"}}}`);;
   }
 
   // Add connections

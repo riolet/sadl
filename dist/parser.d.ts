@@ -31,5 +31,6 @@ export declare class Parser {
     private parseInstance;
     private parseInstanceEntry;
     private parseIPAddress;
+    private parseNAT;
     private parseConnection;
 }

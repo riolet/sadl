@@ -17,6 +17,12 @@ export interface RenderedInstance {
         y: number;
     }[];
 }
+export interface RenderedNAT {
+    name: string;
+    externalIp: string;
+    internalIp: string;
+    position: NodePosition;
+}
 interface Colors {
     background: string;
     node: string;
@@ -24,6 +30,7 @@ interface Colors {
     nodeText: string;
     sercon: string;
     clicon: string;
+    nat: string;
     connection: string;
     connectionText: string;
 }
@@ -42,6 +49,7 @@ export declare class Visualizer {
     private ctx;
     private options;
     private instances;
+    private nats;
     private connections;
     private linkClasses;
     private draggedNode;
@@ -64,6 +72,7 @@ export declare class Visualizer {
     private autoSizeCanvas;
     private layoutInstances;
     private drawInstance;
+    private drawNAT;
     private drawConnections;
     private roundRect;
 }

@@ -24,6 +24,7 @@ export type {
   PortSpec,
   Position,
   Include,
+  NAT,
 } from './types.js';
 
 import { Parser, FileResolver } from './parser.js';

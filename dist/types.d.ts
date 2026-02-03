@@ -48,7 +48,13 @@ export interface Connection extends BaseNode {
     from: string;
     to: string;
 }
-export type ASTNode = NodeClass | LinkClass | Instance | Connection;
+export interface NAT extends BaseNode {
+    kind: 'NAT';
+    name: string;
+    externalIp: string;
+    internalIp: string;
+}
+export type ASTNode = NodeClass | LinkClass | Instance | Connection | NAT;
 export interface Include extends BaseNode {
     kind: 'Include';
     path: string;
@@ -58,5 +64,6 @@ export interface AST {
     nodeClasses: NodeClass[];
     linkClasses: LinkClass[];
     instances: Instance[];
+    nats: NAT[];
     connections: Connection[];
 }

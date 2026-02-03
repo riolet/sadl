@@ -5,7 +5,9 @@ export type TokenType =
   | 'SECTION_LINKCLASS'
   | 'SECTION_INSTANCES'
   | 'SECTION_CONNECTIONS'
+  | 'SECTION_NATS'
   | 'INCLUDE'
+  | 'AT'
   | 'UDP'
   | 'IDENTIFIER'
   | 'NUMBER'
@@ -37,6 +39,7 @@ const SECTION_KEYWORDS: Record<string, TokenType> = {
   linkclass: 'SECTION_LINKCLASS',
   instances: 'SECTION_INSTANCES',
   connections: 'SECTION_CONNECTIONS',
+  nats: 'SECTION_NATS',
 };
 
 export class Lexer {
@@ -186,6 +189,9 @@ export class Lexer {
       } else if (char === '*') {
         this.advance();
         tokens.push({ type: 'STAR', value: '*', line, column });
+      } else if (char === '@') {
+        this.advance();
+        tokens.push({ type: 'AT', value: '@', line, column });
       } else {
         throw new Error(`Unexpected character '${char}' at line ${line}, column ${column}`);
       }

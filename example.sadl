@@ -14,12 +14,15 @@ browser_client.https_connector -> web_server.https_listener
 web_server.mysql_connector -> mysql_server.mysql_listener
 
 #instances
-web_server internal_web_server(192.168.1.10), external_web_server(10.0.10.10)
+web_server internal_web_server(192.168.1.10), external_web_server(192.168.2.10)
 browser_client internal_browser_client, external_browser_client
 mysql_server primary_mysql_server(192.168.1.11)
 
+#NATs
+@ext_web_server_nat (10.0.0.10,192.168.2.10)
+
 #connections
-internal_browser_client -> internal_web_server
+internal_browser_client -> ext_web_server_nat
 external_browser_client -> external_web_server
 internal_web_server -> primary_mysql_server
 external_web_server -> primary_mysql_server

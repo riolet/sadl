@@ -14,6 +14,7 @@ const DEFAULT_OPTIONS = {
         nodeText: '#e8e8e8',
         sercon: '#4ecca3',
         clicon: '#ff6b6b',
+        nat: '#f39c12',
         connection: '#7f8c8d',
         connectionText: '#bdc3c7',
     },
@@ -21,6 +22,7 @@ const DEFAULT_OPTIONS = {
 export class Visualizer {
     constructor(canvas, options = {}) {
         this.instances = [];
+        this.nats = [];
         this.connections = [];
         this.linkClasses = [];
         this.draggedNode = null;
@@ -164,6 +166,10 @@ export class Visualizer {
         // Draw instances/node classes
         for (const instance of this.instances) {
             this.drawInstance(instance);
+        }
+        // Draw NATs
+        for (const nat of this.nats) {
+            this.drawNAT(nat);
         }
         // Restore context
         ctx.restore();
@@ -333,6 +339,7 @@ export class Visualizer {
     }
     layoutInstances(ast) {
         this.instances = [];
+        this.nats = [];
         // Create a map of node classes
         const nodeClassMap = new Map();
         for (const nc of ast.nodeClasses) {
@@ -345,12 +352,19 @@ export class Visualizer {
                 allInstances.push({ name: entry.name, nodeClass: inst.nodeClass, ip: entry.ip });
             }
         }
+        // Create a set of NAT names
+        const natNames = new Set(ast.nats.map(n => n.name));
         // Build adjacency info for layered layout
         const outgoing = new Map(); // from -> [to]
         const incoming = new Map(); // to -> [from]
         for (const inst of allInstances) {
             outgoing.set(inst.name, []);
             incoming.set(inst.name, []);
+        }
+        // Add NATs to the adjacency maps
+        for (const nat of ast.nats) {
+            outgoing.set(nat.name, []);
+            incoming.set(nat.name, []);
         }
         for (const conn of ast.connections) {
             outgoing.get(conn.from)?.push(conn.to);
@@ -377,6 +391,10 @@ export class Visualizer {
         };
         for (const inst of allInstances) {
             assignLayer(inst.name);
+        }
+        // Assign layers to NATs
+        for (const nat of ast.nats) {
+            assignLayer(nat.name);
         }
         // Group instances by layer
         const layerGroups = new Map();
@@ -455,6 +473,24 @@ export class Visualizer {
                 connectors,
             });
         }
+        // Position NATs
+        const natHeight = 60;
+        const natWidth = 120;
+        for (const nat of ast.nats) {
+            const layer = layers.get(nat.name) || 0;
+            const row = rowPositions.get(nat.name) || 0;
+            this.nats.push({
+                name: nat.name,
+                externalIp: nat.externalIp,
+                internalIp: nat.internalIp,
+                position: {
+                    x: padding + layer * columnSpacing + (nodeWidth - natWidth) / 2,
+                    y: padding + row * rowSpacing,
+                    width: natWidth,
+                    height: natHeight,
+                },
+            });
+        }
     }
     drawInstance(instance) {
         const { ctx, options } = this;
@@ -518,28 +554,81 @@ export class Visualizer {
             }
         }
     }
+    drawNAT(nat) {
+        const { ctx, options } = this;
+        const { colors, fontSize, fontFamily } = options;
+        const { position, name, externalIp } = nat;
+        // Draw hexagon shape
+        const cx = position.x + position.width / 2;
+        const cy = position.y + position.height / 2;
+        const w = position.width / 2;
+        const h = position.height / 2;
+        const indent = 15;
+        ctx.fillStyle = colors.node;
+        ctx.strokeStyle = colors.nat;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(position.x + indent, position.y);
+        ctx.lineTo(position.x + position.width - indent, position.y);
+        ctx.lineTo(position.x + position.width, cy);
+        ctx.lineTo(position.x + position.width - indent, position.y + position.height);
+        ctx.lineTo(position.x + indent, position.y + position.height);
+        ctx.lineTo(position.x, cy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // Draw NAT label
+        ctx.fillStyle = colors.nat;
+        ctx.font = `bold ${fontSize}px ${fontFamily}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('NAT', cx, cy - 5);
+        // Draw external IP
+        ctx.fillStyle = colors.nodeText;
+        ctx.font = `${fontSize - 2}px ${fontFamily}`;
+        ctx.fillText(externalIp, cx, cy + 12);
+    }
     drawConnections() {
         const { ctx, options } = this;
         const { colors } = options;
+        const connectorRadius = 6;
         for (const conn of this.connections) {
             const fromInstance = this.instances.find((i) => i.name === conn.from);
             const toInstance = this.instances.find((i) => i.name === conn.to);
-            if (!fromInstance || !toInstance)
+            const fromNAT = this.nats.find((n) => n.name === conn.from);
+            const toNAT = this.nats.find((n) => n.name === conn.to);
+            let fromX, fromY, toX, toY;
+            // Determine from position
+            if (fromInstance) {
+                const fromConnector = fromInstance.connectors.find((c) => c.type === 'clicon');
+                if (!fromConnector)
+                    continue;
+                fromX = fromInstance.position.x + fromInstance.position.width + connectorRadius;
+                fromY = fromInstance.position.y + fromConnector.y;
+            }
+            else if (fromNAT) {
+                fromX = fromNAT.position.x + fromNAT.position.width;
+                fromY = fromNAT.position.y + fromNAT.position.height / 2;
+            }
+            else {
                 continue;
-            // Find client connector on from instance
-            const fromConnector = fromInstance.connectors.find((c) => c.type === 'clicon');
-            // Find server connector on to instance
-            const toConnector = toInstance.connectors.find((c) => c.type === 'sercon');
-            if (!fromConnector || !toConnector)
+            }
+            // Determine to position
+            if (toInstance) {
+                const toConnector = toInstance.connectors.find((c) => c.type === 'sercon');
+                if (!toConnector)
+                    continue;
+                toX = toInstance.position.x - connectorRadius;
+                toY = toInstance.position.y + toConnector.y;
+            }
+            else if (toNAT) {
+                toX = toNAT.position.x;
+                toY = toNAT.position.y + toNAT.position.height / 2;
+            }
+            else {
                 continue;
-            const connectorRadius = 6;
-            // clicon is on right edge, sercon is on left edge
-            const fromX = fromInstance.position.x + fromInstance.position.width + connectorRadius;
-            const fromY = fromInstance.position.y + fromConnector.y;
-            const toX = toInstance.position.x - connectorRadius;
-            const toY = toInstance.position.y + toConnector.y;
+            }
             // Draw curved connection line
-            ctx.strokeStyle = colors.connection;
+            ctx.strokeStyle = toNAT ? colors.nat : colors.connection;
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(fromX, fromY);
@@ -548,7 +637,7 @@ export class Visualizer {
             ctx.stroke();
             // Draw arrow at end
             const arrowSize = 8;
-            ctx.fillStyle = colors.connection;
+            ctx.fillStyle = toNAT ? colors.nat : colors.connection;
             ctx.beginPath();
             ctx.moveTo(toX, toY);
             ctx.lineTo(toX - arrowSize, toY - arrowSize / 2);
